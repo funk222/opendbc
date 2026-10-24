@@ -119,8 +119,18 @@ class CarState(CarStateBase):
     ret.steeringPressed = abs(ret.steeringTorque) > STEER_THRESHOLD
 
     # Check EPS LKA/LTA fault status
-    ret.steerFaultTemporary = cp.vl["EPS_STATUS"]["LKA_STATE"] in TEMP_STEER_FAULTS
-    ret.steerFaultPermanent = cp.vl["EPS_STATUS"]["LKA_STATE"] in PERM_STEER_FAULTS
+    lka_state = cp.vl["EPS_STATUS"]["LKA_STATE"]
+    if self.CP.flags & ToyotaFlags.SINGLE_CAN.value:
+      # Non-standard Corolla EPS used on the single-CAN old-car conversion reports
+      # vendor-specific LKA_STATE codes. Observed healthy: 1 (standby), 5 (active),
+      # 3 (engine off / accessory). 17 is a degraded state after a mid-command power
+      # cut (warm re-crank); it clears with a clean power-down, so treat it as a
+      # temporary (soft-disable) fault rather than permanent. See MIGRATION doc.
+      ret.steerFaultTemporary = lka_state in (0, 9, 11, 17, 21, 25)
+      ret.steerFaultPermanent = False
+    else:
+      ret.steerFaultTemporary = lka_state in TEMP_STEER_FAULTS
+      ret.steerFaultPermanent = lka_state in PERM_STEER_FAULTS
 
     if self.CP.steerControlType == SteerControlType.angle:
       ret.steerFaultTemporary = ret.steerFaultTemporary or cp.vl["EPS_STATUS"]["LTA_STATE"] in TEMP_STEER_FAULTS
