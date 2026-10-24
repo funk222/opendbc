@@ -75,6 +75,10 @@ class ToyotaFlags(IntFlag):
   RAISED_ACCEL_LIMIT = 1024
   SECOC = 2048
 
+  # Custom: single physical CAN bus (grey-panda / OBD-II style conversion with an
+  # Arduino Toyota signal simulator on old non-ADAS vehicles). No split camera bus.
+  SINGLE_CAN = 4096
+
   # deprecated flags
   # these cars are speculated to allow stop and go when the DSU is unplugged
   SNG_WITHOUT_DSU_DEPRECATED = 512

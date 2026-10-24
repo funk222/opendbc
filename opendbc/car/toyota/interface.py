@@ -6,6 +6,8 @@ from opendbc.car.toyota.values import Ecu, CAR, DBC, ToyotaFlags, CarControllerP
                                                   EPS_SCALE, ToyotaSafetyFlags
 from opendbc.car.disable_ecu import disable_ecu
 from opendbc.car.interfaces import CarInterfaceBase
+from opendbc.car.common.conversions import Conversions as CV
+import os
 
 SteerControlType = structs.CarParams.SteerControlType
 
@@ -80,6 +82,29 @@ class CarInterface(CarInterfaceBase):
     elif candidate in (CAR.TOYOTA_CHR, CAR.TOYOTA_CAMRY, CAR.TOYOTA_SIENNA, CAR.LEXUS_CTH, CAR.LEXUS_LS, CAR.LEXUS_NX):
       # TODO: Some of these platforms are not advertised to have full range ACC, do they really all have sng?
       stop_and_go = True
+
+    # Custom single-CAN conversion (grey-panda / OBD-II style on old non-ADAS cars with an
+    # Arduino Toyota signal simulator and a real Corolla EPS). The vehicle is fingerprinted as a
+    # Corolla to reuse the Toyota CAN/EPS stack, but the real chassis dynamics differ. Ported from
+    # the 0.8.14 branch (0814ODY / 0814E350). Selected by VEHICLE_PROFILE at runtime.
+    # NOTE (comma 4): also needs the panda single-CAN no-forward patch + single-CAN flag plumbing;
+    # see MIGRATION_0814_to_comma4_0.11.md. This block only ports the vehicle parameters.
+    vehicle_profile = os.getenv("VEHICLE_PROFILE")
+    if candidate == CAR.TOYOTA_COROLLA and vehicle_profile in ("ODY", "E350"):
+      ret.flags |= ToyotaFlags.SINGLE_CAN.value
+      if vehicle_profile == "E350":
+        # Ford E350 1997 (old-car conversion). Values from the legacy FordE350 old-car config.
+        ret.wheelbase = 4.00
+        ret.steerRatio = 17.0
+        ret.mass = 11500. * CV.LB_TO_KG
+        ret.steerActuatorDelay = 0.12
+      else:  # ODY (Honda Odyssey-like dynamics on Corolla CAN/EPS hardware)
+        # Static defaults aligned to liveParameters learned during a known-good drive
+        # (effective steerRatio ~18.8, angle offset ~-7deg). paramsd still refines online.
+        ret.wheelbase = 3.00
+        ret.steerRatio = 18.8
+        ret.mass = 4471. * CV.LB_TO_KG
+        ret.steerActuatorDelay = 0.10
 
     ret.centerToFront = ret.wheelbase * 0.44
 
